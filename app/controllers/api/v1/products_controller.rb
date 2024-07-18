@@ -48,6 +48,30 @@ class Api::V1::ProductsController < ApplicationController
 
       private
 
+      def authenticate_user!
+        auth_token = request.headers['Authorization']
+        if auth_token.present?
+          begin
+            decoded_token = JWT.decode(auth_token, Rails.application.secrets.secret_key_base)
+            puts "Decoded token: #{decoded_token.inspect}"
+            user_email = decoded_token[0]['email']
+      
+            @current_user = User.find_by(email: user_email)
+            if @current_user && @current_user.valid_authentication_token?(auth_token)
+              # User is authenticated, continue to the action
+            else
+              puts "Invalid token: #{auth_token}"
+              render json: { error: 'Unauthorized' }, status: :unauthorized
+            end
+          rescue JWT::DecodeError => e
+            puts "JWT decode error: #{e.message}"
+            render json: { error: 'Invalid token' }, status: :unauthorized
+          end
+        else
+          render json: { error: 'Missing token' }, status: :unauthorized
+        end
+      end
+
       def set_product
         @product = Product.find(params[:id])
       end
